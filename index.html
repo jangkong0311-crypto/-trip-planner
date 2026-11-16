@@ -183,6 +183,36 @@
                     </div>
                 </div>
 
+                <!-- 5. 1인 예상 예산 입력 -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label for="budget" class="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                            <i data-lucide="wallet" class="w-4 h-4 text-blue-600"></i>
+                            1인 예상 예산 (항공/숙박 제외)
+                        </label>
+                        <span class="text-xs text-slate-400">선택 입력</span>
+                    </div>
+                    <div class="relative">
+                        <input 
+                            type="number" 
+                            id="budget" 
+                            min="1"
+                            step="1"
+                            placeholder="예: 30" 
+                            value="30"
+                            class="w-full pl-4 pr-14 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-base font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all"
+                        >
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">만 원</span>
+                    </div>
+                    <!-- 빠른 예산 선택 칩 -->
+                    <div class="flex gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                        <button type="button" class="quick-budget shrink-0 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors" data-val="10">10만 원</button>
+                        <button type="button" class="quick-budget shrink-0 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors" data-val="30">30만 원</button>
+                        <button type="button" class="quick-budget shrink-0 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors" data-val="50">50만 원</button>
+                        <button type="button" class="quick-budget shrink-0 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors" data-val="100">100만 원</button>
+                    </div>
+                </div>
+
                 <!-- 일정 생성 CTA 버튼 -->
                 <div class="pt-2">
                     <button 
@@ -230,6 +260,13 @@
                         <p id="resultSummary" class="text-xs text-slate-300 leading-relaxed">
                             연인과 함께하는 맛집 탐방, 감성 카페 중심의 여유로운 힐링 코스입니다.
                         </p>
+                        <!-- 1인 총 예상 비용 요약 칩 -->
+                        <div class="pt-1.5 flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-xs font-semibold text-amber-200 border border-white/10">
+                                <i data-lucide="coins" class="w-3.5 h-3.5"></i>
+                                <span id="resultTotalBudget">1인 예상 경비: 약 25~30만 원 (변동 가능)</span>
+                            </span>
+                        </div>
                     </div>
                     <!-- 장식용 배경 원 -->
                     <div class="absolute -right-6 -bottom-8 w-32 h-32 rounded-full bg-blue-500/20 blur-xl"></div>
@@ -243,6 +280,21 @@
                 <!-- 하루별 일정 카드 컨테이너 -->
                 <div id="cardsContainer" class="space-y-5">
                     <!-- JS로 카드 동적 렌더링 -->
+                </div>
+
+                <!-- 다른 일정으로 다시 만들기 버튼 영역 -->
+                <div class="pt-3 pb-2 space-y-2.5">
+                    <button 
+                        type="button" 
+                        id="regenerateBtn"
+                        class="w-full py-3.5 px-5 rounded-2xl border-2 border-blue-600/20 bg-blue-50/70 hover:bg-blue-100/80 active:scale-[0.99] text-blue-700 font-bold text-sm flex items-center justify-center gap-2 transition-all"
+                    >
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        <span>다른 일정으로 다시 만들기</span>
+                    </button>
+                    <p class="text-center text-[11px] text-slate-400">
+                        같은 조건으로 다른 장소와 테마의 코스를 새롭게 추천받습니다.
+                    </p>
                 </div>
             </section>
 
@@ -259,14 +311,18 @@
             days: 3,
             companion: '연인과',
             interests: ['맛집 탐방', '감성 카페'],
+            budget: 30, // 단위: 만 원
             currentPlan: null,
-            selectedDayFilter: 'all' // 'all' 또는 1, 2, 3...
+            selectedDayFilter: 'all', // 'all' 또는 1, 2, 3...
+            attemptCount: 0 // 다시 만들기 횟수 추적 (변주 생성용)
         };
 
         // DOM 요소 참조
         const destInput = document.getElementById('destination');
         const clearDestBtn = document.getElementById('clearDestBtn');
+        const budgetInput = document.getElementById('budget');
         const generateBtn = document.getElementById('generateBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
         const loadingSection = document.getElementById('loadingSection');
         const resultSection = document.getElementById('resultSection');
         const cardsContainer = document.getElementById('cardsContainer');
@@ -290,6 +346,20 @@
                 const val = btn.dataset.val;
                 destInput.value = val;
                 state.destination = val;
+            });
+        });
+
+        // 1-2. 예산 입력 및 빠른 선택 버튼 이벤트
+        budgetInput.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            state.budget = isNaN(val) || val <= 0 ? null : val;
+        });
+
+        document.querySelectorAll('.quick-budget').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const val = parseInt(btn.dataset.val, 10);
+                budgetInput.value = val;
+                state.budget = val;
             });
         });
 
@@ -350,7 +420,7 @@
         }
 
         // 5. 일정 생성 메인 로직 (/api/plan 호출 및 Fallback 예시 데이터 제공)
-        generateBtn.addEventListener('click', async () => {
+        async function createItinerary(isRegenerate = false) {
             const dest = destInput.value.trim();
             if (!dest) {
                 showToast('어디로 떠나실지 여행지를 입력해 주세요!', 'error');
@@ -359,22 +429,40 @@
             }
             state.destination = dest;
 
+            if (isRegenerate) {
+                state.attemptCount += 1;
+            } else {
+                state.attemptCount = 0;
+            }
+
             // UI 상태 변경: 로딩 시작
             generateBtn.disabled = true;
             generateBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            regenerateBtn.disabled = true;
+            regenerateBtn.classList.add('opacity-70', 'cursor-not-allowed');
             resultSection.classList.add('hidden');
             toastMessage.classList.add('hidden');
             loadingSection.classList.remove('hidden');
             
             // 로딩 문구 업데이트
-            document.getElementById('loadingSubtext').textContent = `${state.destination} ${state.days}일 일정을 구성하고 있어요...`;
+            document.getElementById('loadingSubtext').textContent = isRegenerate
+                ? `${state.destination}의 또 다른 매력적인 코스를 찾고 있어요...`
+                : `${state.destination} ${state.days}일 일정을 구성하고 있어요...`;
+
+            // 이전 일정에서 추천했던 대표 장소명 추출 (중복 회피 힌트용)
+            const previousPlaces = isRegenerate && state.currentPlan?.itinerary
+                ? state.currentPlan.itinerary.flatMap(d => d.schedule.map(s => s.title)).slice(0, 12)
+                : [];
 
             // Vercel 함수(/api/plan)로 보낼 요청 페이로드
             const payload = {
                 destination: state.destination,
                 days: state.days,
                 companion: state.companion,
-                interests: state.interests.length > 0 ? state.interests : ['자유 여행']
+                interests: state.interests.length > 0 ? state.interests : ['자유 여행'],
+                budget: state.budget,
+                variation: state.attemptCount,
+                excludePlaces: previousPlaces
             };
 
             try {
@@ -422,75 +510,102 @@
                 loadingSection.classList.add('hidden');
                 generateBtn.disabled = false;
                 generateBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                regenerateBtn.disabled = false;
+                regenerateBtn.classList.remove('opacity-70', 'cursor-not-allowed');
             }
-        });
+        }
+
+        generateBtn.addEventListener('click', () => createItinerary(false));
+        regenerateBtn.addEventListener('click', () => createItinerary(true));
 
         // 6. 사용자 입력에 맞춘 동적 예시 일정 생성기 (Fallback Mock Data)
-        function generateMockPlan({ destination, days, companion, interests }) {
+        function generateMockPlan({ destination, days, companion, interests, budget, variation = 0 }) {
             const interestText = interests.join(', ');
             const durationText = days === 1 ? '당일치기' : `${days - 1}박 ${days}일`;
+            const isTightBudget = budget && budget <= 15;
 
-            // 입력된 여행지나 관심사를 반영해 현실감 있는 예시 일정 구성
+            // 입력된 여행지나 관심사를 반영해 현실감 있는 예시 일정 구성 (variation에 따라 순서/테마 변주)
             const templates = [
                 {
                     theme: '설레는 시작과 핵심 명소 탐방',
                     activities: [
-                        { time: '10:30', category: '명소', title: `${destination} 웰컴 스팟 & 첫 산책`, desc: `${companion} 함께 여행의 시작을 알리는 대표 랜드마크 산책 코스입니다.` },
-                        { time: '12:30', category: '맛집', title: `${destination} 로컬 시그니처 점심`, desc: `현지인들도 줄 서서 먹는 대표 향토 음식으로 든든하게 식사합니다.` },
-                        { time: '14:30', category: '카페', title: `오션뷰/감성 루프탑 카페 휴식`, desc: `${interests[0] || '감성'} 취향을 저격하는 시그니처 음료와 디저트 타임.` },
-                        { time: '17:30', category: '야경/명소', title: `노을이 아름다운 선셋 포인트`, desc: `황금빛 노을을 배경으로 ${companion} 인생샷을 남기기 좋은 시간입니다.` },
-                        { time: '19:30', category: '맛집', title: `분위기 좋은 저녁 다이닝`, desc: `하루를 마무리하며 맛있는 음식과 함께 여유로운 대화를 나눕니다.` }
+                        { time: '10:30', category: '명소', title: `${destination} 웰컴 스팟 & 첫 산책`, estimatedCost: '무료 ~ 약 1만 원', desc: `${companion} 함께 여행의 시작을 알리는 대표 랜드마크 산책 코스입니다.` },
+                        { time: '12:30', category: '맛집', title: `${destination} 로컬 시그니처 점심`, estimatedCost: isTightBudget ? '약 1~1.5만 원' : '약 1.5~2.5만 원', desc: `현지인들도 줄 서서 먹는 대표 향토 음식으로 든든하게 식사합니다.` },
+                        { time: '14:30', category: '카페', title: `오션뷰/감성 루프탑 카페 휴식`, estimatedCost: '약 1~1.5만 원', desc: `${interests[0] || '감성'} 취향을 저격하는 시그니처 음료와 디저트 타임.` },
+                        { time: '17:30', category: '야경/명소', title: `노을이 아름다운 선셋 포인트`, estimatedCost: '무료 (주차비 별도)', desc: `황금빛 노을을 배경으로 ${companion} 인생샷을 남기기 좋은 시간입니다.` },
+                        { time: '19:30', category: '맛집', title: `분위기 좋은 저녁 다이닝`, estimatedCost: isTightBudget ? '약 1.5~2만 원' : '약 3~5만 원', desc: `하루를 마무리하며 맛있는 음식과 함께 여유로운 대화를 나눕니다.` }
                     ]
                 },
                 {
                     theme: `${interests[0] || '취향'} 집중 탐방 및 여유로운 휴식`,
                     activities: [
-                        { time: '09:30', category: '카페', title: `모닝 브런치 & 스페셜티 커피`, desc: `상쾌한 아침 공기와 함께 즐기는 갓 구운 베이커리와 핸드드립 커피.` },
-                        { time: '11:30', category: '체험/테마', title: `${destination} 숨은 보석 같은 테마 코스`, desc: `복잡한 도심을 벗어나 ${companion} 온전히 집중할 수 있는 특별한 시간.` },
-                        { time: '13:30', category: '맛집', title: `SNS 화제의 인기 맛집 런치`, desc: `정갈한 플레이팅과 깊은 맛을 자랑하는 로컬 인기 레스토랑.` },
-                        { time: '16:00', category: '쇼핑/소품', title: `아기자기한 소품샵 & 골목 투어`, desc: `${destination}만의 감성이 담긴 기념품과 엽서를 구경하는 재미.` },
-                        { time: '19:00', category: '야시장/맛집', title: `밤의 열기를 느끼는 야경 & 야식`, desc: `화려한 조명 아래에서 즐기는 다채로운 먹거리와 산책.` }
-                    ]
-                },
-                {
-                    theme: '아쉬움을 달래는 힐링과 귀가 준비',
-                    activities: [
-                        { time: '10:00', category: '자연/힐링', title: `숲길 혹은 해안도로 드라이브`, desc: `창문을 열고 바람을 맞으며 ${destination}의 풍경을 눈에 담습니다.` },
-                        { time: '12:00', category: '맛집', title: `마지막 만찬, 든든한 한 끼`, desc: `집으로 돌아가기 전 꼭 맛봐야 할 마지막 미식 코스.` },
-                        { time: '14:00', category: '카페', title: `특산물 디저트 카페 & 기념품 구매`, desc: `지인들에게 선물할 특산품을 챙기고 여유롭게 티타임을 갖습니다.` },
-                        { time: '16:00', category: '이동', title: `아쉬움을 뒤로하고 집으로 출발`, desc: `즐거웠던 ${durationText}의 추억을 정리하며 안전하게 귀가합니다.` }
+                        { time: '09:30', category: '카페', title: `모닝 브런치 & 스페셜티 커피`, estimatedCost: '약 1.5~2만 원', desc: `상쾌한 아침 공기와 함께 즐기는 갓 구운 베이커리와 핸드드립 커피.` },
+                        { time: '11:30', category: '체험/테마', title: `${destination} 숨은 보석 같은 테마 코스`, estimatedCost: isTightBudget ? '약 1만 원 내외' : '약 2~4만 원', desc: `복잡한 도심을 벗어나 ${companion} 온전히 집중할 수 있는 특별한 시간.` },
+                        { time: '13:30', category: '맛집', title: `SNS 화제의 인기 맛집 런치`, estimatedCost: '약 1.5~2.5만 원', desc: `정갈한 플레이팅과 깊은 맛을 자랑하는 로컬 인기 레스토랑.` },
+                        { time: '16:00', category: '쇼핑/소품', title: `아기자기한 소품샵 & 골목 투어`, estimatedCost: '약 1~3만 원 (자율)', desc: `${destination}만의 감성이 담긴 기념품과 엽서를 구경하는 재미.` },
+                        { time: '19:00', category: '야시장/맛집', title: `밤의 열기를 느끼는 야경 & 야식`, estimatedCost: '약 1.5~2.5만 원', desc: `화려한 조명 아래에서 즐기는 다채로운 먹거리와 산책.` }
                     ]
                 },
                 {
                     theme: '깊이 있는 로컬 문화와 여유 만끽',
                     activities: [
-                        { time: '10:00', category: '문화/예술', title: `${destination} 현대 미술관 & 전시 관람`, desc: `영감을 채워주는 감각적인 공간에서 차분하게 작품을 감상합니다.` },
-                        { time: '12:30', category: '맛집', title: `제철 식재료로 차린 건강한 밥상`, desc: `자극적이지 않고 깊은 풍미가 느껴지는 정통 로컬 식당.` },
-                        { time: '15:00', category: '액티비티', title: `특별한 추억을 만드는 체험 클래스`, desc: `${companion} 함께 직접 만들고 경험하며 오래 기억될 기념품 제작.` },
-                        { time: '18:30', category: '맛집', title: `로맨틱한 야경 레스토랑`, desc: `${destination}의 밤하늘을 바라보며 즐기는 근사한 저녁 식사.` }
+                        { time: '10:00', category: '문화/예술', title: `${destination} 현대 미술관 & 전시 관람`, estimatedCost: '약 1~2만 원', desc: `영감을 채워주는 감각적인 공간에서 차분하게 작품을 감상합니다.` },
+                        { time: '12:30', category: '맛집', title: `제철 식재료로 차린 건강한 밥상`, estimatedCost: '약 1.5~2.5만 원', desc: `자극적이지 않고 깊은 풍미가 느껴지는 정통 로컬 식당.` },
+                        { time: '15:00', category: '액티비티', title: `특별한 추억을 만드는 체험 클래스`, estimatedCost: isTightBudget ? '약 2만 원 내외' : '약 3~5만 원', desc: `${companion} 함께 직접 만들고 경험하며 오래 기억될 기념품 제작.` },
+                        { time: '18:30', category: '맛집', title: `로맨틱한 야경 레스토랑`, estimatedCost: isTightBudget ? '약 2만 원대' : '약 3~5만 원', desc: `${destination}의 밤하늘을 바라보며 즐기는 근사한 저녁 식사.` }
+                    ]
+                },
+                {
+                    theme: '골목 감성과 로컬 히든 스팟 투어',
+                    activities: [
+                        { time: '10:00', category: '명소', title: `${destination} 구도심 헤리티지 산책길`, estimatedCost: '무료', desc: `오래된 건축물과 트렌디한 상점이 어우러진 골목을 천천히 걷습니다.` },
+                        { time: '12:00', category: '맛집', title: `노포 감성 가득한 로컬 면/국밥 맛집`, estimatedCost: '약 1~1.5만 원', desc: `오랜 세월 사랑받아온 깊은 국물 맛으로 든든하게 점심을 해결합니다.` },
+                        { time: '14:30', category: '카페', title: `한옥/빈티지 개조 디저트 카페`, estimatedCost: '약 1~1.5만 원', desc: `고즈넉한 마당과 감각적인 인테리어가 돋보이는 공간에서의 휴식.` },
+                        { time: '17:00', category: '자연/힐링', title: `도심 속 비밀 정원 & 수목원 산책`, estimatedCost: '약 5천 원~1만 원', desc: `푸른 녹음 사이로 불어오는 바람을 맞으며 여유롭게 힐링합니다.` }
                     ]
                 }
             ];
 
+            const closingTemplate = {
+                theme: '아쉬움을 달래는 힐링과 귀가 준비',
+                activities: [
+                    { time: '10:00', category: '자연/힐링', title: `숲길 혹은 해안도로 드라이브`, estimatedCost: '무료 ~ 약 5천 원', desc: `창문을 열고 바람을 맞으며 ${destination}의 풍경을 눈에 담습니다.` },
+                    { time: '12:00', category: '맛집', title: `마지막 만찬, 든든한 한 끼`, estimatedCost: '약 1.5~2.5만 원', desc: `집으로 돌아가기 전 꼭 맛봐야 할 마지막 미식 코스.` },
+                    { time: '14:00', category: '카페', title: `특산물 디저트 카페 & 기념품 구매`, estimatedCost: '약 1.5~3만 원', desc: `지인들에게 선물할 특산품을 챙기고 여유롭게 티타임을 갖습니다.` },
+                    { time: '16:00', category: '이동', title: `아쉬움을 뒤로하고 집으로 출발`, estimatedCost: '교통비 별도', desc: `즐거웠던 ${durationText}의 추억을 정리하며 안전하게 귀가합니다.` }
+                ]
+            };
+
             const itinerary = [];
             for (let i = 1; i <= days; i++) {
-                // 마지막 날은 귀가 코스가 있는 3번째 템플릿(인덱스 2) 우선 사용
-                let templateIndex = (i - 1) % templates.length;
+                // 마지막 날(2일 이상일 때)은 귀가 코스를 배치하되, 다시 만들기 시 첫날 테마를 다르게 회전
                 if (days > 1 && i === days) {
-                    templateIndex = 2;
+                    itinerary.push({
+                        day: i,
+                        theme: closingTemplate.theme,
+                        schedule: closingTemplate.activities
+                    });
+                } else {
+                    const templateIndex = (i - 1 + variation) % templates.length;
+                    const selectedTemplate = templates[templateIndex];
+                    itinerary.push({
+                        day: i,
+                        theme: selectedTemplate.theme,
+                        schedule: selectedTemplate.activities
+                    });
                 }
-                const selectedTemplate = templates[templateIndex];
-                
-                itinerary.push({
-                    day: i,
-                    theme: selectedTemplate.theme,
-                    schedule: selectedTemplate.activities
-                });
             }
 
+            const budgetGuide = budget 
+                ? `1인 예산 ${budget}만 원 내외 (현지 식비·입장료 기준)` 
+                : `1인 약 ${days * 8}~${days * 12}만 원대 (현지 체류비 기준)`;
+
+            const versionLabel = variation > 0 ? ` (추천 버전 #${variation + 1})` : '';
+
             return {
-                title: `${destination} ${durationText} 맞춤 일정`,
-                summary: `${companion} 함께하는 '${interestText}' 중심의 추천 여행 코스입니다.`,
+                title: `${destination} ${durationText} 맞춤 일정${versionLabel}`,
+                summary: `${companion} 함께하는 '${interestText}' 중심의 ${variation > 0 ? '새로운 대안 ' : ''}추천 여행 코스입니다.`,
+                totalEstimatedCost: budgetGuide,
                 itinerary: itinerary
             };
         }
@@ -503,6 +618,9 @@
             // 상단 요약 배너 업데이트
             document.getElementById('resultTitle').textContent = planData.title || `${state.destination} 추천 일정`;
             document.getElementById('resultSummary').textContent = planData.summary || '';
+            document.getElementById('resultTotalBudget').textContent = planData.totalEstimatedCost 
+                ? `예상 경비: ${planData.totalEstimatedCost}` 
+                : '현지 상황에 따라 비용 변동 가능';
             
             const sourceTag = document.getElementById('resultSourceTag');
             if (isMock) {
@@ -609,11 +727,17 @@
                             </div>
                             
                             <!-- 시간 및 카테고리 뱃지 -->
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-xs font-bold text-blue-600 font-mono">${item.time}</span>
-                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${badgeStyle}">
-                                    ${item.category}
-                                </span>
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-bold text-blue-600 font-mono">${item.time}</span>
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${badgeStyle}">
+                                        ${item.category}
+                                    </span>
+                                </div>
+                                ${item.estimatedCost ? `
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold">
+                                    <span>💰</span>${item.estimatedCost}
+                                </span>` : ''}
                             </div>
                             
                             <!-- 장소명 및 상세 설명 -->
@@ -643,11 +767,16 @@
         document.getElementById('copyPlanBtn').addEventListener('click', () => {
             if (!state.currentPlan) return;
 
-            let textToCopy = `[${state.currentPlan.title}]\n${state.currentPlan.summary}\n\n`;
+            let textToCopy = `[${state.currentPlan.title}]\n${state.currentPlan.summary}\n`;
+            if (state.currentPlan.totalEstimatedCost) {
+                textToCopy += `💰 예상 경비: ${state.currentPlan.totalEstimatedCost}\n`;
+            }
+            textToCopy += `\n`;
             state.currentPlan.itinerary.forEach(day => {
                 textToCopy += `■ Day ${day.day}: ${day.theme}\n`;
                 day.schedule.forEach(s => {
-                    textToCopy += `  - ${s.time} [${s.category}] ${s.title}: ${s.desc}\n`;
+                    const costTag = s.estimatedCost ? ` (${s.estimatedCost})` : '';
+                    textToCopy += `  - ${s.time} [${s.category}] ${s.title}${costTag}: ${s.desc}\n`;
                 });
                 textToCopy += '\n';
             });
